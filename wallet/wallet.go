@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 
 	"golang.org/x/crypto/ripemd160"
 )
@@ -20,6 +21,33 @@ const (
 type Wallet struct {
 	PrivateKey ecdsa.PrivateKey
 	PublicKey  []byte
+}
+
+type WalletWrapper struct {
+	PrivateKey []byte
+	PublicKey  []byte
+}
+
+func NewWalletWrapper(w *Wallet) *WalletWrapper {
+	privateKeyBytes, err := x509.MarshalECPrivateKey(&w.PrivateKey)
+	if err != nil {
+		panic(err)
+	}
+	return &WalletWrapper{
+		PrivateKey: privateKeyBytes,
+		PublicKey:  w.PublicKey,
+	}
+}
+
+func (ww *WalletWrapper) ToWallet() *Wallet {
+	privateKey, err := x509.ParseECPrivateKey(ww.PrivateKey)
+	if err != nil {
+		panic(err)
+	}
+	return &Wallet{
+		PrivateKey: *privateKey,
+		PublicKey:  ww.PublicKey,
+	}
 }
 
 // Address - это функция, которая возвращает адрес кошелька.

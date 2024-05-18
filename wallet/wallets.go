@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"bytes"
+	"crypto/elliptic"
 	"encoding/gob"
 	"fmt"
 	"os"
@@ -11,6 +12,10 @@ const walletFile = "./tmp/wallets.data"
 
 type Wallets struct {
 	Wallets map[string]*Wallet
+}
+
+func init() {
+	gob.Register(elliptic.P256()) // Register the elliptic curve type
 }
 
 func (ws *Wallets) LoadFile() error {
@@ -23,14 +28,18 @@ func (ws *Wallets) LoadFile() error {
 		return err
 	}
 
-	var wallets Wallets
+	var walletWrappers map[string]*WalletWrapper
 	decoder := gob.NewDecoder(bytes.NewReader(fileContent))
-	err = decoder.Decode(&wallets)
+	err = decoder.Decode(&walletWrappers)
 	if err != nil {
 		return err
 	}
 
-	ws.Wallets = wallets.Wallets
+	ws.Wallets = make(map[string]*Wallet)
+	for address, wrapper := range walletWrappers {
+		ws.Wallets[address] = wrapper.ToWallet()
+	}
+
 	return nil
 }
 
@@ -80,8 +89,12 @@ func (ws *Wallets) AddWallet() string {
 
 func (ws *Wallets) SaveFile() error {
 	var content bytes.Buffer
+	walletWrappers := make(map[string]*WalletWrapper)
+	for address, wallet := range ws.Wallets {
+		walletWrappers[address] = NewWalletWrapper(wallet)
+	}
 	encoder := gob.NewEncoder(&content)
-	err := encoder.Encode(ws)
+	err := encoder.Encode(walletWrappers)
 	if err != nil {
 		return err
 	}
